@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GemLedger – Trust · Provenance · Value</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --green: #0f6b3f;
+    --green-light: #e6f4ec;
+    --green-mid: #d1ead9;
+    --red: #c9152c;
+    --bg: #f8f6f0;
+    --white: #ffffff;
+    --border: #e5e0d5;
+    --text: #1a1a1a;
+    --muted: #6b7280;
+    --sidebar-w: 272px;
+    --radius: 14px;
+    --shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.04);
+    --shadow-hover: 0 4px 20px rgba(15,107,63,.13);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d0ccc4; border-radius: 4px; }
+
+  /* ── SVG icons (inline lucide) ── */
+  .icon { display: inline-block; width: 20px; height: 20px; vertical-align: middle; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .icon-lg { width: 28px; height: 28px; }
+  .icon-xl { width: 112px; height: 112px; stroke-width: 1.2; }
+
+  /* ── Layout ── */
+  #sidebar {
+    position: fixed; left: 0; top: 0;
+    width: var(--sidebar-w); height: 100vh;
+    background: var(--white); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow-y: auto; z-index: 100;
+    transition: transform .3s ease;
+  }
+  #sidebar-inner { padding: 20px 16px; flex: 1; }
+  #main { margin-left: var(--sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+  #topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--white); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 24px;
+  }
+  #content { flex: 1; padding: 24px; }
+
+  /* Mobile overlay */
+  #mob-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; }
+  #mob-toggle {
+    display: none; background: none; border: none; cursor: pointer;
+    padding: 6px; color: var(--text);
+  }
+
+  @media (max-width: 1024px) {
+    #main { margin-left: 0; }
+    #sidebar { transform: translateX(-100%); }
+    #sidebar.open { transform: translateX(0); }
+    #mob-overlay.show { display: block; }
+    #mob-toggle { display: flex; align-items: center; }
+  }
+
+  /* ── Brand ── */
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; padding: 4px 0; }
+  .brand-icon {
+    width: 44px; height: 44px; background: var(--green); border-radius: 12px;
+    display: grid; place-items: center; color: #fff; flex-shrink: 0;
+  }
+  .brand-name { font-family: 'Cormorant Garamond', serif; font-size: 28px; color: var(--green); line-height: 1.1; }
+  .brand-sub { font-size: 11px; color: var(--muted); letter-spacing: .3px; }
+
+  /* ── Nav ── */
+  .nav-group { margin-top: 20px; padding: 0 8px; font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #aaa; }
+  .nav-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    background: none; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13.5px; color: #4b5563;
+    text-align: left; transition: background .15s, color .15s;
+    position: relative;
+  }
+  .nav-btn:hover { background: #f5f4f1; }
+  .nav-btn.active { background: var(--green-light); color: var(--green); font-weight: 600; }
+  .nav-badge {
+    margin-left: auto; background: var(--green-mid); color: var(--green);
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 99px;
+  }
+
+  /* ── Sidebar footer ── */
+  #sidebar-footer {
+    margin: 16px; padding: 14px 16px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  }
+  #sidebar-footer .name { font-weight: 600; color: var(--green); font-size: 14px; }
+  #sidebar-footer .plan { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Topbar ── */
+  .search-wrap { position: relative; flex: 1; }
+  .search-wrap input {
+    width: 100%; padding: 10px 14px 10px 38px;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); font-family: 'DM Sans', sans-serif; font-size: 13.5px;
+    outline: none; color: var(--text);
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .search-wrap input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(15,107,63,.1); }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #aaa; }
+  .topbar-user { text-align: right; white-space: nowrap; }
+  .topbar-user .uname { font-weight: 600; font-size: 14px; }
+  .topbar-user .uorg  { font-size: 11px; color: var(--muted); }
+  .topbar-sep { width: 1px; height: 36px; background: var(--border); flex-shrink: 0; }
+  .bell-btn { background: none; border: none; cursor: pointer; color: #6b7280; padding: 4px; display: flex; align-items: center; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--white); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card-hover { transition: transform .2s, box-shadow .2s, border-color .2s; }
+  .card-hover:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); border-color: #a8d5be; }
+
+  /* ── Stat cards ── */
+  .stats-grid { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }
+  .stat-btn { width: 100%; background: none; border: none; cursor: pointer; text-align: left; padding: 0; }
+  .stat-inner { display: flex; align-items: center; gap: 16px; }
+  .stat-emoji { font-size: 32px; line-height: 1; }
+  .stat-label { font-size: 12.5px; color: var(--muted); margin-bottom: 2px; }
+  .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 32px; line-height: 1.1; }
+  .stat-link { font-size: 12px; color: var(--green); margin-top: 2px; }
+
+  /* ── Stone record ── */
+  .stone-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stone-sku { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stone-title { font-family: 'Cormorant Garamond', serif; font-size: 36px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .badge-verified { background: #f0faf5; border: 1px solid #a8d5be; color: var(--green); font-size: 12px; padding: 3px 12px; border-radius: 99px; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+  .stone-layout { display: grid; gap: 24px; grid-template-columns: 340px 1fr; }
+  .stone-img {
+    height: 280px; border-radius: 12px;
+    background: linear-gradient(135deg, #bfdbfe 0%, #1d4ed8 100%);
+    display: grid; place-items: center; color: #1e3a8a;
+  }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; align-content: start; }
+  .info-label { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .info-value { font-weight: 500; font-size: 14px; }
+  .btn-primary {
+    background: var(--green); color: #fff; border: none; cursor: pointer;
+    padding: 10px 22px; border-radius: 10px; font-family: 'DM Sans', sans-serif;
+    font-size: 14px; font-weight: 600; transition: opacity .15s, transform .15s;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+  .btn-secondary {
+    background: none; border: 1px solid var(--border); cursor: pointer;
+    padding: 10px 22px; border-radius: 10px; font-family: 'DM Sans', sans-serif;
+    font-size: 14px; font-weight: 600; transition: background .15s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-secondary:hover { background: var(--bg); }
+
+  /* ── Provenance ── */
+  .prov-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+  .prov-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; }
+  .prov-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .prov-verified {
+    background: var(--green-light); border-radius: 12px; padding: 20px;
+    text-align: center; margin-bottom: 20px;
+  }
+  .prov-verified-title { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: var(--green); margin-top: 8px; }
+  .prov-verified-sub { font-size: 13px; color: #4b7a60; margin-top: 4px; }
+  .timeline { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+  .timeline-item { display: flex; gap: 12px; align-items: flex-start; }
+  .tl-dot {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--green-light);
+    color: var(--green); display: grid; place-items: center; font-size: 14px; flex-shrink: 0;
+  }
+  .tl-label { font-weight: 600; font-size: 14px; }
+  .tl-time { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .hash-box { background: var(--bg); border-radius: 10px; padding: 14px; margin-top: 16px; }
+  .hash-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .hash-val { font-family: 'JetBrains Mono', monospace; font-size: 12px; word-break: break-all; }
+
+  /* ── Buyer match ── */
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; }
+  .link-btn { background: none; border: none; color: var(--green); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; }
+  .buyer-card {
+    width: 100%; background: none; border: 1px solid #f0ebe4;
+    border-radius: 12px; padding: 12px 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    cursor: pointer; text-align: left;
+    transition: background .15s, border-color .15s;
+    margin-top: 10px;
+  }
+  .buyer-card:hover { background: var(--green-light); border-color: #a8d5be; }
+  .buyer-name { font-weight: 600; font-size: 14px; }
+  .buyer-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .buyer-interest { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  .buyer-score { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--green); flex-shrink: 0; }
+
+  /* ── GPS Map ── */
+  .map-controls { display: grid; gap: 10px; grid-template-columns: 1fr 160px 100px; margin-top: 14px; }
+  .map-input, .map-select {
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    background: var(--white); color: var(--text); outline: none;
+    transition: border-color .2s;
+  }
+  .map-input:focus, .map-select:focus { border-color: var(--green); }
+  .map-canvas {
+    height: 260px; border-radius: 12px; background: var(--green-light);
+    display: grid; place-items: center; position: relative;
+    overflow: hidden; color: var(--green);
+  }
+  .map-dot-g { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 8px rgba(15,107,63,.18); }
+  .map-dot-r { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 8px rgba(201,21,44,.15); }
+  .map-label { position: absolute; bottom: 12px; background: #fff; padding: 6px 14px; border-radius: 99px; font-size: 11.5px; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+  .map-layout { display: grid; gap: 20px; grid-template-columns: 1fr 300px; margin-top: 16px; }
+  .tags-wrap { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+  .tag-btn {
+    background: var(--green-light); color: var(--green);
+    border: none; cursor: pointer; padding: 5px 12px;
+    border-radius: 99px; font-size: 11.5px; font-family: 'DM Sans', sans-serif;
+    transition: background .15s;
+  }
+  .tag-btn:hover { background: var(--green-mid); }
+  .lead-card {
+    width: 100%; background: none; border: 1px solid #f0ebe4;
+    border-radius: 10px; padding: 10px 12px;
+    cursor: pointer; text-align: left;
+    transition: background .15s;
+    margin-top: 8px;
+  }
+  .lead-card:hover { background: var(--green-light); }
+  .lead-name { font-weight: 600; font-size: 13.5px; }
+  .lead-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .lead-fit { font-size: 11px; color: var(--green); margin-top: 2px; }
+
+  /* ── Exhibitions ── */
+  .event-item { border-bottom: 1px solid #f0ebe4; padding-bottom: 12px; margin-top: 14px; }
+  .event-item:last-child { border-bottom: none; }
+  .event-name { font-weight: 600; font-size: 14px; }
+  .event-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Generic tab ── */
+  .tab-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+  .tab-icon-wrap {
+    width: 48px; height: 48px; background: var(--green-light); color: var(--green);
+    border-radius: 12px; display: grid; place-items: center; flex-shrink: 0;
+  }
+  .tab-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; line-height: 1; }
+  .tab-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .empty-msg { font-size: 14px; color: #6b7280; }
+
+  /* ── Dashboard grid ── */
+  .dash-main { display: grid; gap: 24px; grid-template-columns: 1fr 360px; margin-top: 24px; }
+  .dash-bottom { display: grid; gap: 24px; grid-template-columns: 1fr 1fr 1fr; margin-top: 24px; }
+
+  /* ── Import / CRM ── */
+  .upload-zone {
+    border: 2px dashed #d0cbc2; border-radius: 12px;
+    padding: 24px; background: #faf9f6;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .upload-zone h3 { font-family: 'Cormorant Garamond', serif; font-size: 22px; margin-top: 8px; }
+  .upload-zone .cols { font-size: 12px; color: var(--muted); }
+  .upload-notice { font-size: 13px; color: var(--green); margin-top: 4px; }
+  .upload-preview {
+    margin-top: 12px; background: var(--white); border-radius: 10px;
+    padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: #4b5563; max-height: 180px; overflow-y: auto;
+    white-space: pre-wrap; border: 1px solid var(--border);
+  }
+  .file-input { margin-top: 10px; font-size: 13px; cursor: pointer; }
+
+  /* ── Add Stone form ── */
+  .form-grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .form-input {
+    padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px;
+    font-family: 'DM Sans', sans-serif; font-size: 13.5px;
+    background: var(--white); color: var(--text); outline: none; width: 100%;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .form-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(15,107,63,.1); }
+  .form-full { grid-column: 1 / -1; }
+
+  /* ── Responsive breakpoints ── */
+  @media (max-width: 1280px) {
+    .dash-main { grid-template-columns: 1fr; }
+    .dash-bottom { grid-template-columns: 1fr 1fr; }
+    .stone-layout { grid-template-columns: 1fr; }
+    .stone-img { height: 220px; }
+    .map-layout { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 900px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .dash-bottom { grid-template-columns: 1fr; }
+    .map-controls { grid-template-columns: 1fr 1fr; }
+    .map-controls .map-search-btn { grid-column: 1 / -1; }
+  }
+  @media (max-width: 600px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    #content { padding: 14px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .stone-title { font-size: 26px; }
+    .tab-title { font-size: 28px; }
+    .map-controls { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: 1fr; }
+    .stone-header { flex-direction: column; }
+  }
+
+  /* ── Cert tag colours ── */
+  .cert-note { font-size: 13px; color: var(--muted); }
+
+  /* ── Page visibility ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .page.active { animation: fadeUp .25s ease; }
+</style>
+</head>
+<body>
+
+<!-- Mobile overlay -->
+<div id="mob-overlay" onclick="closeSidebar()"></div>
+
+<!-- ══════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════ -->
+<aside id="sidebar">
+  <div id="sidebar-inner">
+    <!-- Brand -->
+    <div class="brand">
+      <div class="brand-icon">
+        <!-- Gem icon -->
+        <svg class="icon" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9"/><polyline points="2 9 12 9 22 9"/><line x1="12" y1="3" x2="12" y2="9"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">GemLedger</div>
+        <div class="brand-sub">Trust · Provenance · Value</div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav id="nav">
+      <button class="nav-btn active" data-page="dashboard" onclick="goTo('dashboard', this)">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+
+      <p class="nav-group">Inventory</p>
+      <button class="nav-btn" data-page="stones" onclick="goTo('stones', this)">
+        <svg class="icon" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9"/><polyline points="2 9 12 9 22 9"/><line x1="12" y1="3" x2="12" y2="9"/></svg>
+        Stones
+      </button>
+      <button class="nav-btn" data-page="lots" onclick="goTo('lots', this)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        Lots
+      </button>
+      <button class="nav-btn" data-page="certificates" onclick="goTo('certificates', this)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Certificates
+      </button>
+      <button class="nav-btn" data-page="import" onclick="goTo('import', this)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import Excel
+      </button>
+
+      <p class="nav-group">CRM</p>
+      <button class="nav-btn" data-page="buyers" onclick="goTo('buyers', this)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Buyers
+      </button>
+      <button class="nav-btn" data-page="suppliers" onclick="goTo('suppliers', this)">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        Suppliers
+      </button>
+      <button class="nav-btn" data-page="communications" onclick="goTo('communications', this)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Communications
+      </button>
+      <button class="nav-btn" data-page="deals" onclick="goTo('deals', this)">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        Deals
+      </button>
+
+      <p class="nav-group">Intelligence</p>
+      <button class="nav-btn" data-page="ai" onclick="goTo('ai', this)">
+        <svg class="icon" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9"/><line x1="12" y1="3" x2="7" y2="9"/><line x1="12" y1="3" x2="17" y2="9"/></svg>
+        AI Buyer Match
+      </button>
+      <button class="nav-btn" data-page="market" onclick="goTo('market', this)">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Market Insights
+      </button>
+      <button class="nav-btn" data-page="price" onclick="goTo('price', this)">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Price Trends
+      </button>
+      <button class="nav-btn" data-page="exhibitions" onclick="goTo('exhibitions', this)">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Exhibitions
+      </button>
+      <button class="nav-btn" data-page="gps" onclick="goTo('gps', this)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        GPS Buyer Map
+      </button>
+
+      <p class="nav-group">Provenance</p>
+      <button class="nav-btn" data-page="blockchain" onclick="goTo('blockchain', this)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Blockchain Proof
+        <span class="nav-badge">NEW</span>
+      </button>
+
+      <p class="nav-group">Settings</p>
+      <button class="nav-btn" data-page="settings" onclick="goTo('settings', this)">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+
+      <button class="nav-btn" data-page="addStone" onclick="goTo('addStone', this)" style="margin-top:10px;background:var(--green-light);color:var(--green);font-weight:600;">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+        Add Stone
+      </button>
+    </nav>
+  </div>
+
+  <div id="sidebar-footer">
+    <div class="name">Mineral Source</div>
+    <div class="plan">Enterprise Plan</div>
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════ -->
+<div id="main">
+  <!-- Top bar -->
+  <header id="topbar">
+    <button id="mob-toggle" onclick="openSidebar()" aria-label="Menu">
+      <svg class="icon icon-lg" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6"  x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="search-wrap">
+      <svg class="icon search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="global-search" placeholder="Search stones, clients, certificates, blockchain IDs…" />
+    </div>
+    <button class="bell-btn" onclick="alert('No new notifications.')">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </button>
+    <div class="topbar-sep"></div>
+    <div class="topbar-user">
+      <div class="uname">Zafarullah Hashim</div>
+      <div class="uorg">Mineral Source</div>
+    </div>
+  </header>
+
+  <!-- ── Content ── -->
+  <div id="content">
+
+    <!-- ══════════════════════════════════════
+         PAGE: DASHBOARD
+    ══════════════════════════════════════ -->
+    <div class="page active" id="page-dashboard">
+      <!-- Stat cards -->
+      <div class="stats-grid">
+        <button class="stat-btn" onclick="goTo('stones', document.querySelector('[data-page=stones]'))">
+          <div class="card card-hover">
+            <div class="stat-inner">
+              <div class="stat-emoji">💎</div>
+              <div>
+                <div class="stat-label">Total Stones</div>
+                <div class="stat-value">128</div>
+                <div class="stat-link">View details →</div>
+              </div>
+            </div>
+          </div>
+        </button>
+        <button class="stat-btn" onclick="goTo('deals', document.querySelector('[data-page=deals]'))">
+          <div class="card card-hover">
+            <div class="stat-inner">
+              <div class="stat-emoji">💰</div>
+              <div>
+                <div class="stat-label">Total Value</div>
+                <div class="stat-value">$2.48M</div>
+                <div class="stat-link">View details →</div>
+              </div>
+            </div>
+          </div>
+        </button>
+        <button class="stat-btn" onclick="goTo('buyers', document.querySelector('[data-page=buyers]'))">
+          <div class="card card-hover">
+            <div class="stat-inner">
+              <div class="stat-emoji">👥</div>
+              <div>
+                <div class="stat-label">Active Buyers</div>
+                <div class="stat-value">5</div>
+                <div class="stat-link">View details →</div>
+              </div>
+            </div>
+          </div>
+        </button>
+        <button class="stat-btn" onclick="goTo('blockchain', document.querySelector('[data-page=blockchain]'))">
+          <div class="card card-hover">
+            <div class="stat-inner">
+              <div class="stat-emoji">🛡️</div>
+              <div>
+                <div class="stat-label">Blockchain Proofs</div>
+                <div class="stat-value">42</div>
+                <div class="stat-link">View details →</div>
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <!-- Stone record + Provenance -->
+      <div class="dash-main">
+        <div id="dash-stone-record"></div>
+        <div id="dash-provenance"></div>
+      </div>
+
+      <!-- Buyer match + GPS + Exhibitions -->
+      <div class="dash-bottom">
+        <div id="dash-buyer-match"></div>
+        <div id="dash-gps-map"></div>
+        <div id="dash-exhibitions"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: STONES
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-stones">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9"/><polyline points="2 9 12 9 22 9"/><line x1="12" y1="3" x2="12" y2="9"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Stones</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div id="stones-record-inner"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: LOTS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-lots">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Lots</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <p class="empty-msg">Production content, filters, forms, and reports will connect here.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: CERTIFICATES
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-certificates">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Certificates</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <p class="cert-note">Gübelin, SSEF, GIA, and GRS certificate records appear here.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: IMPORT EXCEL
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-import">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Import Excel</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div style="display:grid;gap:20px;grid-template-columns:1fr 1fr;">
+          <div class="upload-zone">
+            <svg class="icon icon-lg" style="color:var(--green)" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h3>Bulk upload buyers</h3>
+            <div class="cols">Expected columns: name, company, city, country, phone, email, wants, origins, previous</div>
+            <input type="file" class="file-input" accept=".csv,.xlsx,.xls" id="import-buyers-file" />
+            <div class="upload-notice" id="import-buyers-notice">Upload CSV or Excel files. Production will map columns automatically.</div>
+            <pre class="upload-preview" id="import-buyers-preview">[]</pre>
+          </div>
+          <div class="upload-zone">
+            <svg class="icon icon-lg" style="color:var(--green)" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h3>Bulk upload suppliers</h3>
+            <div class="cols">Expected columns: name, company, city, country, phone, email, minerals, supplyType, notes</div>
+            <input type="file" class="file-input" accept=".csv,.xlsx,.xls" id="import-suppliers-file" />
+            <div class="upload-notice" id="import-suppliers-notice">Upload CSV or Excel files. Production will map columns automatically.</div>
+            <pre class="upload-preview" id="import-suppliers-preview">[]</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: BUYERS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-buyers">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Buyers</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div style="display:grid;gap:24px;grid-template-columns:1fr 400px;align-items:start;">
+          <div id="buyers-match-inner"></div>
+          <div class="upload-zone">
+            <svg class="icon icon-lg" style="color:var(--green)" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h3>Bulk upload buyers</h3>
+            <div class="cols">Expected columns: name, company, city, country, phone, email, wants, origins, previous</div>
+            <input type="file" class="file-input" accept=".csv,.xlsx,.xls" id="buyers-import-file" />
+            <div class="upload-notice" id="buyers-import-notice">Upload CSV or Excel files. Production will map columns automatically.</div>
+            <pre class="upload-preview" id="buyers-import-preview">[]</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: SUPPLIERS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-suppliers">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Suppliers</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div class="upload-zone" style="max-width:560px;">
+          <svg class="icon icon-lg" style="color:var(--green)" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <h3>Bulk upload suppliers</h3>
+          <div class="cols">Expected columns: name, company, city, country, phone, email, minerals, supplyType, notes</div>
+          <input type="file" class="file-input" accept=".csv,.xlsx,.xls" id="suppliers-file" />
+          <div class="upload-notice" id="suppliers-notice">Upload CSV or Excel files. Production will map columns automatically.</div>
+          <pre class="upload-preview" id="suppliers-preview">[]</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: COMMUNICATIONS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-communications">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Communications</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <p class="empty-msg">Production content, filters, forms, and reports will connect here.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: DEALS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-deals">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Deals</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <p class="empty-msg">Production content, filters, forms, and reports will connect here.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: AI BUYER MATCH
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-ai">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9"/><line x1="12" y1="3" x2="7" y2="9"/><line x1="12" y1="3" x2="17" y2="9"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">AI Buyer Match</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div id="ai-buyer-match-inner"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: MARKET INSIGHTS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-market">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Market Insights</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <p class="empty-msg">Production content, filters, forms, and reports will connect here.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: PRICE TRENDS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-price">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Price Trends</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <p class="empty-msg">Production content, filters, forms, and reports will connect here.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: EXHIBITIONS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-exhibitions">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Exhibitions</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div id="exhibitions-inner"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: GPS BUYER MAP
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-gps">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">GPS Buyer Map</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div id="gps-inner"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: BLOCKCHAIN PROOF
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-blockchain">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Blockchain Proof</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div id="blockchain-inner"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: SETTINGS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-settings">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Settings</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <p class="empty-msg">Production content, filters, forms, and reports will connect here.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PAGE: ADD STONE
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-addStone">
+      <div class="card">
+        <div class="tab-header">
+          <div class="tab-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <div>
+            <div class="tab-title">Add Stone</div>
+            <div class="tab-sub">This tab is linked and ready for backend data.</div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <input class="form-input" type="text" placeholder="Stone name" id="add-stone-name" />
+          <input class="form-input" type="text" placeholder="Carat" id="add-stone-carat" />
+          <input class="form-input" type="text" placeholder="Origin" id="add-stone-origin" />
+          <input class="form-input" type="text" placeholder="Certificate" id="add-stone-cert" />
+          <button class="btn-primary form-full" onclick="handleAddStone()">Save and Generate Blockchain Proof</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#content -->
+</div><!-- /#main -->
+
+<script>
+/* ════════════════════════════════════════
+   DATA
+════════════════════════════════════════ */
+const STONES = {
+  RUBY: 'Ruby',
+  BLU_SAPPHIRE: 'Blue Sapphire',
+  EMERALD: 'Emerald',
+  PARAIBA: 'Paraiba',
+  PADPARADSCHA: 'Padparadscha',
+  DIAMOND: 'Diamond',
+};
+
+const stone = {
+  id: 's1',
+  sku: 'GL-2024-05-0001',
+  title: 'Kashmir Sapphire',
+  type: 'BLU_SAPPHIRE',
+  carat: 6.27,
+  origin: 'Kashmir, India',
+  shape: 'Cushion',
+  treatment: 'No indications of heating',
+  certs: ['Gübelin Report No. 24051234'],
+  status: 'Verified',
+  owner: 'Mineral Source',
+  chainId: '0x7a3b8d2f6c9e4a1b8f2d9e7c...',
+  timeline: ['Registered', 'Gübelin Verified', 'Blockchain Recorded', 'Ownership Secured'],
+};
+
+const buyers = [
+  { name: 'Claire Beaumont',    city: 'Paris, France',       company: 'Luxury Jewellery House',     score: 98, interest: 'Kashmir Sapphires, Royal Blue' },
+  { name: 'Kenji Nakamura',     city: 'Tokyo, Japan',         company: 'Private Collector',          score: 94, interest: 'No-heat Sapphire, Ruby' },
+  { name: 'Aïsha Al-Mansouri', city: 'Dubai, UAE',           company: 'High Jewellery Designer',    score: 91, interest: 'Emerald, Ruby, Diamond' },
+  { name: 'Michael Stein',      city: 'New York, USA',        company: 'Private Client Advisor',     score: 88, interest: 'Certified rare stones' },
+  { name: 'Lina Al-Sabah',      city: 'Kuwait City, Kuwait',  company: 'VIP Jewellery Buyer',        score: 84, interest: 'Ruby, Diamond, Emerald' },
+];
+
+const exhibitions = [
+  { name: 'JCK Las Vegas 2026',                    city: 'Las Vegas, USA', date: 'May 29–Jun 1' },
+  { name: 'Jewellery & Gem Asia Hong Kong',         city: 'Hong Kong',      date: 'Jun 18–21' },
+  { name: 'Mineral & Gem Sainte-Marie-aux-Mines',  city: 'France',         date: 'Jun 24–28' },
+  { name: 'Singapore International Jewelry Expo',  city: 'Singapore',      date: 'Jul 9–12' },
+  { name: 'IIJS Premiere 2026',                    city: 'Mumbai, India',  date: 'Aug 5–9' },
+];
+
+const gpsCategories = ['Gemstone buyers', 'Mineral dealers', 'Jewellers', 'Gem labs', 'Wholesalers', 'Auction advisors'];
+const gpsLeads = [
+  { name: 'Royal Gem House',           type: 'Jeweller',        distance: '1.2 km', fit: 'Ruby, Emerald' },
+  { name: 'Global Mineral Traders',    type: 'Mineral dealer',  distance: '2.8 km', fit: 'Collector stones' },
+  { name: 'Elite Gem Lab',             type: 'Gem lab',         distance: '3.4 km', fit: 'Certification' },
+  { name: 'Heritage Jewellery Buyers', type: 'Buyer',           distance: '4.1 km', fit: 'No-heat Sapphire' },
+];
+const gpsCities = ['Dubai','Geneva','Hong Kong','Bangkok','Singapore','Mumbai','Colombo','New York','Paris','Tokyo'];
+
+/* ════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════ */
+let currentPage = 'dashboard';
+
+function goTo(id, btn) {
+  // hide all pages
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  // show target
+  const target = document.getElementById('page-' + id);
+  if (target) target.classList.add('active');
+  // update nav
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else {
+    const nb = document.querySelector(`.nav-btn[data-page="${id}"]`);
+    if (nb) nb.classList.add('active');
+  }
+  currentPage = id;
+  closeSidebar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('mob-overlay').classList.add('show'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('mob-overlay').classList.remove('show'); }
+
+/* ════════════════════════════════════════
+   STONE RECORD HTML
+════════════════════════════════════════ */
+function stoneRecordHTML() {
+  return `
+    <div class="stone-header">
+      <div>
+        <div class="stone-sku">Stones / ${stone.sku}</div>
+        <div class="stone-title">
+          ${stone.title}
+          <span class="badge-verified">✓ Verified</span>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="alert('Share link copied: https://gemledger.app/stones/GL-2024-05-0001')">Share</button>
+    </div>
+    <div class="stone-layout">
+      <div class="stone-img">
+        <svg class="icon-xl icon" viewBox="0 0 24 24"><polygon points="6 3 18 3 22 9 12 22 2 9"/><polyline points="2 9 12 9 22 9"/><line x1="12" y1="3" x2="12" y2="9"/></svg>
+      </div>
+      <div class="info-grid">
+        <div><div class="info-label">Stone ID</div><div class="info-value">${stone.sku}</div></div>
+        <div><div class="info-label">Variety</div><div class="info-value">${STONES[stone.type]}</div></div>
+        <div><div class="info-label">Weight</div><div class="info-value">${stone.carat} Carats</div></div>
+        <div><div class="info-label">Shape</div><div class="info-value">${stone.shape}</div></div>
+        <div><div class="info-label">Origin</div><div class="info-value">${stone.origin}</div></div>
+        <div><div class="info-label">Treatment</div><div class="info-value">${stone.treatment}</div></div>
+        <div><div class="info-label">Certificate</div><div class="info-value">${stone.certs.join(', ')}</div></div>
+        <div><div class="info-label">Owner</div><div class="info-value">${stone.owner}</div></div>
+      </div>
+    </div>`;
+}
+
+/* ════════════════════════════════════════
+   PROVENANCE HTML
+════════════════════════════════════════ */
+function provenanceHTML() {
+  const tl = stone.timeline.map((item, i) => `
+    <div class="timeline-item">
+      <div class="tl-dot">✓</div>
+      <div>
+        <div class="tl-label">${item}</div>
+        <div class="tl-time">2024-05-12 14:${32 + i*4}:45</div>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="prov-header">
+      <svg class="icon icon-lg" style="color:var(--green);flex-shrink:0;" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <div>
+        <div class="prov-title">Blockchain Provenance</div>
+        <div class="prov-sub">Secured by Gübelin Blockchain</div>
+      </div>
+    </div>
+    <div class="prov-verified">
+      <svg class="icon" style="color:var(--green)" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      <div class="prov-verified-title">Provenance Verified</div>
+      <div class="prov-verified-sub">This gemstone is recorded on the Gübelin Blockchain</div>
+    </div>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:6px;">Provenance Timeline</div>
+    <div class="timeline">${tl}</div>
+    <div class="hash-box">
+      <div class="hash-label">Blockchain Hash</div>
+      <div class="hash-val">${stone.chainId}</div>
+    </div>
+    <button class="btn-secondary" style="margin-top:14px;width:100%;" onclick="alert('Opening blockchain explorer…')">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="15" x2="13" y2="15"/></svg>
+      View on Blockchain
+    </button>`;
+}
+
+/* ════════════════════════════════════════
+   BUYER MATCH HTML
+════════════════════════════════════════ */
+function buyerMatchHTML(showAll) {
+  const visible = showAll ? buyers : buyers.slice(0, 3);
+  const cards = visible.map(b => `
+    <button class="buyer-card" onclick="alert('${b.name}\\n${b.company}\\n${b.city}\\nInterest: ${b.interest}\\nMatch: ${b.score}%')">
+      <div>
+        <div class="buyer-name">${b.name}</div>
+        <div class="buyer-meta">${b.city} · ${b.company}</div>
+        <div class="buyer-interest">Interested in: ${b.interest}</div>
+      </div>
+      <div class="buyer-score">${b.score}%</div>
+    </button>`).join('');
+  return `
+    <div class="section-head">
+      <div class="section-title">AI Buyer Match</div>
+      <button class="link-btn" onclick="toggleBuyerMatch(this)">View all →</button>
+    </div>
+    ${cards}`;
+}
+
+let buyerMatchShowAll = false;
+function toggleBuyerMatch(btn) {
+  buyerMatchShowAll = !buyerMatchShowAll;
+  btn.textContent = buyerMatchShowAll ? 'Show less' : 'View all →';
+  const containers = ['dash-buyer-match','buyers-match-inner','ai-buyer-match-inner'];
+  containers.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = buyerMatchHTML(buyerMatchShowAll);
+  });
+}
+
+/* ════════════════════════════════════════
+   GPS MAP HTML
+════════════════════════════════════════ */
+function gpsMapHTML(city, query) {
+  const cityOpts = gpsCities.map(c => `<option${c===city?' selected':''}>${c}</option>`).join('');
+  const tagBtns  = gpsCategories.map(cat => `<button class="tag-btn" onclick="updateGpsQuery('${cat}')">${cat}</button>`).join('');
+  const leadList = gpsLeads.map(l => `
+    <button class="lead-card" onclick="openMaps()">
+      <div class="lead-name">${l.name}</div>
+      <div class="lead-meta">${l.type} · <span id="gps-city-disp">${city}</span> · ${l.distance}</div>
+      <div class="lead-fit">Fit: ${l.fit}</div>
+    </button>`).join('');
+  return `
+    <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;">
+      <div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:20px;">GPS Buyer Map</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">Uses Google Maps search + AI enrichment to find gemstone, mineral, jeweller and lab contacts.</div>
+      </div>
+      <button class="btn-primary" onclick="openMaps()">Open Google Maps</button>
+    </div>
+    <div class="map-controls" style="margin-top:14px;">
+      <input class="map-input" id="gps-query" value="${query}" placeholder="Search by jewellers, wholesalers, labs, miners…" oninput="gpsQuery=this.value" />
+      <select class="map-select" id="gps-city" onchange="gpsCity=this.value;document.querySelectorAll('#gps-city-disp').forEach(e=>e.textContent=this.value)">${cityOpts}</select>
+      <button class="btn-secondary map-search-btn" onclick="openMaps()" style="justify-content:center;">Search</button>
+    </div>
+    <div class="map-layout">
+      <div class="map-canvas">
+        <svg style="opacity:.2;width:120px;height:120px;stroke:var(--green);fill:none;stroke-width:2;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <div class="map-dot-g" style="left:28%;top:38%;"></div>
+        <div class="map-dot-r" style="left:52%;top:48%;"></div>
+        <div class="map-dot-g" style="left:68%;top:32%;"></div>
+        <div class="map-label">Live integration target: Google Places API + AI ranking</div>
+      </div>
+      <div>
+        <div style="font-weight:600;font-size:14px;">Search categories</div>
+        <div class="tags-wrap">${tagBtns}</div>
+        <div style="margin-top:12px;">${leadList}</div>
+      </div>
+    </div>`;
+}
+
+let gpsCity  = 'Dubai';
+let gpsQuery = 'gemstone buyers jewellers mineral dealers gem labs';
+
+function updateGpsQuery(cat) {
+  gpsQuery = cat;
+  document.getElementById('gps-query').value = cat;
+}
+function openMaps() {
+  const q = (document.getElementById('gps-query')?.value || gpsQuery) + ' near ' + (document.getElementById('gps-city')?.value || gpsCity);
+  window.open('https://www.google.com/maps/search/' + encodeURIComponent(q), '_blank');
+}
+
+/* ════════════════════════════════════════
+   EXHIBITIONS HTML
+════════════════════════════════════════ */
+function exhibitionsHTML() {
+  return exhibitions.map(ev => `
+    <div class="event-item">
+      <div class="event-name">${ev.name}</div>
+      <div class="event-meta">${ev.date} · ${ev.city}</div>
+    </div>`).join('');
+}
+
+/* ════════════════════════════════════════
+   CSV PARSER
+════════════════════════════════════════ */
+function parseCsv(text) {
+  const clean = String(text || '').replace(/\r/g, '').trim();
+  if (!clean) return [];
+  const lines = clean.split('\n').filter(Boolean);
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.trim());
+    const row = {};
+    headers.forEach((h, i) => { row[h] = vals[i] || ''; });
+    return row;
+  });
+}
+
+function bindUpload(fileId, noticeId, previewId, type) {
+  const input = document.getElementById(fileId);
+  if (!input) return;
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const rows = parseCsv(String(e.target.result || '')).slice(0, 8);
+      document.getElementById(noticeId).textContent = `${rows.length} ${type} rows ready to import. Excel parser can be connected in backend production.`;
+      document.getElementById(previewId).textContent = JSON.stringify(rows, null, 2);
+    };
+    reader.readAsText(file);
+  });
+}
+
+/* ════════════════════════════════════════
+   ADD STONE
+════════════════════════════════════════ */
+function handleAddStone() {
+  const name  = document.getElementById('add-stone-name').value.trim();
+  const carat = document.getElementById('add-stone-carat').value.trim();
+  const origin= document.getElementById('add-stone-origin').value.trim();
+  const cert  = document.getElementById('add-stone-cert').value.trim();
+  if (!name || !carat) { alert('Please fill in at least Stone name and Carat.'); return; }
+  alert(`Stone saved!\n\nName: ${name}\nCarat: ${carat}\nOrigin: ${origin || '—'}\nCertificate: ${cert || '—'}\n\nBlockchain proof generation initiated.`);
+}
+
+/* ════════════════════════════════════════
+   INIT
+════════════════════════════════════════ */
+function init() {
+  // Inject stone record
+  ['dash-stone-record','stones-record-inner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = stoneRecordHTML();
+  });
+
+  // Inject provenance
+  ['dash-provenance','blockchain-inner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = provenanceHTML();
+  });
+
+  // Inject buyer match
+  ['dash-buyer-match','buyers-match-inner','ai-buyer-match-inner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = buyerMatchHTML(false);
+  });
+
+  // Inject GPS map
+  ['dash-gps-map','gps-inner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = gpsMapHTML(gpsCity, gpsQuery);
+  });
+
+  // Inject exhibitions
+  ['dash-exhibitions','exhibitions-inner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (id === 'dash-exhibitions') {
+        el.innerHTML = `<div class="card"><div class="section-title" style="margin-bottom:4px;">Upcoming exhibitions</div>${exhibitionsHTML()}</div>`;
+      } else {
+        el.innerHTML = exhibitionsHTML();
+      }
+    }
+  });
+
+  // Bind file uploads
+  bindUpload('import-buyers-file',   'import-buyers-notice',   'import-buyers-preview',   'buyers');
+  bindUpload('import-suppliers-file','import-suppliers-notice','import-suppliers-preview', 'suppliers');
+  bindUpload('buyers-import-file',   'buyers-import-notice',   'buyers-import-preview',    'buyers');
+  bindUpload('suppliers-file',       'suppliers-notice',       'suppliers-preview',        'suppliers');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
